@@ -5,7 +5,6 @@ from app.core.database import Base
 
 class Interview(Base):
     __tablename__ = "interviews"
-
     id = Column(Integer, primary_key=True, index=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id"))
     status = Column(String, default="scheduled")
@@ -16,5 +15,4 @@ class Interview(Base):
     feedback = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
     candidate = relationship("Candidate", back_populates="interviews")

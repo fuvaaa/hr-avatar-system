@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.interview import Interview
 from app.models.candidate import Candidate
-from typing import Dict, Any
+from typing import List, Dict, Any
 import os
 import json
 
@@ -33,6 +33,23 @@ async def create_interview(
         "candidate_id": interview.candidate_id,
         "status": interview.status
     }
+
+# Добавьте этот эндпоинт для получения списка всех интервью
+@router.get("/", response_model=List[dict])
+async def get_interviews(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    interviews = db.query(Interview).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": interview.id,
+            "candidate_id": interview.candidate_id,
+            "status": interview.status,
+            "start_time": interview.start_time,
+            "end_time": interview.end_time,
+            "match_score": interview.match_score,
+            "feedback": interview.feedback
+        }
+        for interview in interviews
+    ]
 
 @router.get("/{interview_id}", response_model=dict)
 async def get_interview(interview_id: int, db: Session = Depends(get_db)):

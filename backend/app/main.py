@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import candidates, interviews, reports
-
-
-# Импорты из текущего пакета
-from .api import candidates, interviews, reports
-from .core.database import engine
-from app.core.database import Base
-
+from app.core.database import Base, engine
 
 app = FastAPI(title="HR Avatar System API")
+
+# Отладочный вывод
+print("Проверка импортов:")
+print("candidates.router:", candidates.router)
+print("interviews.router:", interviews.router)
+print("reports.router:", reports.router)
 
 # Настройка CORS
 app.add_middleware(
@@ -29,9 +29,12 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 async def root():
     return {"message": "HR Avatar System API"}
 
+@app.get("/test")
+async def test():
+    return {"message": "Тестовый эндпоинт работает"}
+
 @app.on_event("startup")
 async def startup_event():
     # Создаем таблицы при запуске
-    from app.core.database import engine
-    from app.models import Base
     Base.metadata.create_all(bind=engine)
+    print("Таблицы базы данных созданы")
