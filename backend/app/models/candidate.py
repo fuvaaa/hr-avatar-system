@@ -1,0 +1,17 @@
+from sqlalchemy import Column, Integer, String, Float, Text, JSON
+from app.core.database import Base
+
+class Candidate(Base):
+    __tablename__ = 'candidates'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)
+    phone = Column(String)
+    resume_path = Column(String)
+    position = Column(String)
+    skills = Column(JSON)  # или Text, если храните JSON как строку
+    experience = Column(JSON)
+    education = Column(JSON)
+    match_percentage = Column(Float, default=0.0)
+    status = Column(String, default="uploaded")

@@ -81,7 +81,7 @@ htmlcov/
 *.pt
 *.pth
 data/
-models/
+#models/
 
 # Временные файлы
 *.tmp
