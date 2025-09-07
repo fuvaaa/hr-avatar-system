@@ -1,112 +1,129 @@
-import React, { useState } from 'react';
-import FileUpload from './components/FileUpload';
-import AnalysisResult from './components/AnalysisResult';
-import InterviewInterface from './components/InterviewInterface';
-import ReportViewer from './components/ReportViewer';
-import VoiceInterface from './components/VoiceInterface';
+// src/App.js
+import React, { useState, useEffect } from 'react';
+import './App.css';
+
+// Конфигурация API
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://hr-avatar-backend.onrender.com';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('upload');
-  const [analysisData, setAnalysisData] = useState(null);
-  const [interviewSession, setInterviewSession] = useState(null);
-  const [reportData, setReportData] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleAnalysisComplete = (data) => {
-    setAnalysisData(data);
-    setActiveTab('analysis');
+  // Загрузка списка кандидатов
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
+
+  const fetchCandidates = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/candidates/`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch candidates');
+      }
+      const data = await response.json();
+      setCandidates(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleInterviewStart = (sessionData) => {
-    setInterviewSession(sessionData);
-    setActiveTab('interview');
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/candidates/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload file');
+      }
+      
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      
+      // Обновляем список кандидатов
+      fetchCandidates();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  const handleInterviewComplete = (evaluation) => {
-    setReportData(evaluation);
-    setActiveTab('report');
+  const generateInterviewExample = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/interviews/generate-example`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate example');
+      }
+      
+      const result = await response.json();
+      console.log('Example generated:', result);
+      alert('Пример интервью успешно создан!');
+    } catch (err) {
+      setError(err.message);
+    }
   };
+
+  if (loading) return <div>Загрузка...</div>;
+  if (error) return <div>Ошибка: {error}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="gradient-bg text-white py-6 px-4 shadow-lg">
-        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center">
-          <div className="flex items-center mb-4 md:mb-0">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mr-3">
-              <span className="text-indigo-600 font-bold text-xl">HR</span>
-            </div>
-            <h1 className="text-2xl font-bold">HR-Avatar</h1>
-          </div>
-          <p className="text-indigo-100 text-center md:text-right">
-            AI-система для подбора и оценки персонала
-          </p>
-        </div>
+    <div className="App">
+      <header className="App-header">
+        <h1>HR Avatar System</h1>
+        <p>Система автоматизации HR-процессов</p>
       </header>
 
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap justify-center md:justify-start">
-            {[
-              { id: 'upload', label: 'Загрузка документов' },
-              { id: 'analysis', label: 'Анализ соответствия' },
-              { id: 'interview', label: 'Интервью' },
-              { id: 'voice', label: 'Голосовое взаимодействие' },
-              { id: 'report', label: 'Отчеты' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                className={`px-4 py-3 font-medium text-sm transition-colors ${
-                  activeTab === tab.id 
-                    ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
+      <main className="App-main">
+        <section className="upload-section">
+          <h2>Загрузка резюме</h2>
+          <input 
+            type="file" 
+            accept=".pdf,.doc,.docx" 
+            onChange={handleFileUpload}
+            className="file-input"
+          />
+        </section>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {activeTab === 'upload' && (
-          <FileUpload 
-            onAnalysisComplete={handleAnalysisComplete}
-            onInterviewStart={handleInterviewStart}
-          />
-        )}
-        
-        {activeTab === 'analysis' && analysisData && (
-          <AnalysisResult data={analysisData} />
-        )}
-        
-        {activeTab === 'interview' && (
-          <InterviewInterface 
-            sessionData={interviewSession}
-            onInterviewComplete={handleInterviewComplete}
-          />
-        )}
-        
-        {activeTab === 'voice' && (
-          <VoiceInterface />
-        )}
-        
-        {activeTab === 'report' && reportData && (
-          <ReportViewer data={reportData} />
-        )}
+        <section className="actions-section">
+          <button onClick={generateInterviewExample} className="action-button">
+            Создать пример интервью
+          </button>
+        </section>
+
+        <section className="candidates-section">
+          <h2>Кандидаты ({candidates.length})</h2>
+          {candidates.length === 0 ? (
+            <p>Пока нет кандидатов</p>
+          ) : (
+            <div className="candidates-list">
+              {candidates.map(candidate => (
+                <div key={candidate.id} className="candidate-card">
+                  <h3>{candidate.name}</h3>
+                  <p><strong>Должность:</strong> {candidate.position}</p>
+                  <p><strong>Email:</strong> {candidate.email}</p>
+                  <p><strong>Статус:</strong> {candidate.status}</p>
+                  <p><strong>Соответствие:</strong> {candidate.match_percentage}%</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8 px-4 mt-12">
-        <div className="container mx-auto text-center">
-          <p>© 2023 HR-Avatar. Решение для хакатона.</p>
-          <p className="text-gray-400 mt-2 text-sm">
-            Автоматизация HR-процессов с использованием искусственного интеллекта
-          </p>
-        </div>
+      <footer className="App-footer">
+        <p>HR Avatar System &copy; {new Date().getFullYear()}</p>
       </footer>
     </div>
   );
