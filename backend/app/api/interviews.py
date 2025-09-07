@@ -130,7 +130,6 @@ class AIInterviewer:
 @router.post("/", response_model=dict)
 async def create_interview(
     candidate_id: int,
-    vacancy_id: int,
     db: Session = Depends(get_db)
 ):
     """Создание интервью с AI-генерацией вопросов"""
@@ -148,7 +147,6 @@ async def create_interview(
     # Создание интервью
     interview = Interview(
         candidate_id=candidate_id,
-        vacancy_id=vacancy_id,
         status="scheduled",
         questions=json.dumps(questions),  # Сохраняем вопросы как JSON
         start_time=datetime.now() + timedelta(days=1)  # Запланируем на завтра
@@ -258,41 +256,46 @@ async def submit_answers(
 async def generate_interview_example(db: Session = Depends(get_db)):
     """Генерация примера прохождения интервью с тестовыми данными"""
     
-    # Создаем тестового кандидата
-    candidate = Candidate(
-        name="Иван Петров",
-        email="ivan.petrov@example.com",
-        phone="+7 (900) 123-45-67",
-        resume_path="uploads/ivan_petrov_resume.pdf",
-        position="Python разработчик",
-        skills=json.dumps(["Python", "FastAPI", "PostgreSQL", "Docker", "Git"]),
-        experience=json.dumps([
-            {
-                "company": "Технологии Будущего",
-                "position": "Middle Python Developer",
-                "period": "2020-2023"
-            },
-            {
-                "company": "Цифровые Решения",
-                "position": "Junior Python Developer",
-                "period": "2018-2020"
-            }
-        ]),
-        education=json.dumps([
-            {
-                "institution": "Московский Технический Университет",
-                "degree": "Магистр",
-                "specialty": "Программная инженерия",
-                "year": "2018"
-            }
-        ]),
-        match_percentage=85.5,
-        status="processed"
-    )
+    # Проверяем, существует ли уже кандидат с таким email
+    test_email = "ivan.petrov@example.com"
+    candidate = db.query(Candidate).filter(Candidate.email == test_email).first()
     
-    db.add(candidate)
-    db.commit()
-    db.refresh(candidate)
+    if not candidate:
+        # Создаем тестового кандидата только если его еще нет
+        candidate = Candidate(
+            name="Иван Петров",
+            email=test_email,
+            phone="+7 (900) 123-45-67",
+            resume_path="uploads/ivan_petrov_resume.pdf",
+            position="Python разработчик",
+            skills=json.dumps(["Python", "FastAPI", "PostgreSQL", "Docker", "Git"]),
+            experience=json.dumps([
+                {
+                    "company": "Технологии Будущего",
+                    "position": "Middle Python Developer",
+                    "period": "2020-2023"
+                },
+                {
+                    "company": "Цифровые Решения",
+                    "position": "Junior Python Developer",
+                    "period": "2018-2020"
+                }
+            ]),
+            education=json.dumps([
+                {
+                    "institution": "Московский Технический Университет",
+                    "degree": "Магистр",
+                    "specialty": "Программная инженерия",
+                    "year": "2018"
+                }
+            ]),
+            match_percentage=85.5,
+            status="processed"
+        )
+        
+        db.add(candidate)
+        db.commit()
+        db.refresh(candidate)
     
     # Создаем тестовое интервью
     start_time = datetime.now() - timedelta(days=5)
@@ -324,8 +327,8 @@ async def generate_interview_example(db: Session = Depends(get_db)):
         end_time=end_time,
         match_score=total_score / len(qa_results) if qa_results else 0,
         feedback="Кандидат показал отличные технические знания. Хорошо разбирается в Python и фреймворках. Имеет практический опыт работы с базами данных. Рекомендуется к найму.",
-        questions=json.dumps(questions),  # Сохраняем вопросы как JSON
-        answers=json.dumps(qa_results)    # Сохраняем ответы как JSON
+        questions=json.dumps(questions),
+        answers=json.dumps(qa_results)
     )
     
     db.add(interview)
