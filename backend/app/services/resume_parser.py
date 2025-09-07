@@ -1,19 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.models.candidate import Candidate
-from typing import List, Dict, Any
-import os
-import json
+# backend/app/services/resume_parser.py
 import PyPDF2
 import docx
 import re
-
-router = APIRouter()
+from typing import Dict, Any
 
 class ResumeParser:
-    """Упрощенный парсер резюме для извлечения ключевых данных"""
-    
     @staticmethod
     def extract_text_from_pdf(file_path: str) -> str:
         with open(file_path, 'rb') as file:
@@ -26,25 +17,54 @@ class ResumeParser:
         return " ".join([paragraph.text for paragraph in doc.paragraphs])
     
     @staticmethod
-    def extract_contact_info(text: str) -> Dict[str, str]:
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        phone_pattern = r'(\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6})'
+    def parse_resume(file_path: str) -> Dict[str, Any]:
+        if file_path.endswith('.pdf'):
+            text = ResumeParser.extract_text_from_pdf(file_path)
+        elif file_path.endswith('.docx'):
+            text = ResumeParser.extract_text_from_docx(file_path)
+        else:
+            raise ValueError("Unsupported file format")
         
-        email = re.search(email_pattern, text)
-        phone = re.search(phone_pattern, text)
-        
-        return {
-            'email': email.group() if email else '',
-            'phone': phone.group() if phone else ''
+        # Извлечение данных с помощью регулярных выражений
+        data = {
+            'name': ResumeParser._extract_name(text),
+            'email': ResumeParser._extract_email(text),
+            'phone': ResumeParser._extract_phone(text),
+            'skills': ResumeParser._extract_skills(text),
+            'experience': ResumeParser._extract_experience(text),
+            'education': ResumeParser._extract_education(text)
         }
+        
+        return data
     
     @staticmethod
-    def extract_skills(text: str) -> List[str]:
+    def _extract_name(text: str) -> str:
+        # Упрощенный алгоритм извлечения имени
+        lines = text.split('\n')
+        for line in lines[:5]:  # Имя обычно в начале документа
+            if len(line.split()) >= 2 and all(word[0].isupper() for word in line.split()[:2]):
+                return line.strip()
+        return ""
+    
+    @staticmethod
+    def _extract_email(text: str) -> str:
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        match = re.search(email_pattern, text)
+        return match.group() if match else ""
+    
+    @staticmethod
+    def _extract_phone(text: str) -> str:
+        phone_pattern = r'(\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6})'
+        match = re.search(phone_pattern, text)
+        return match.group() if match else ""
+    
+    @staticmethod
+    def _extract_skills(text: str) -> list:
+        # Базовый список навыков для поиска
         common_skills = [
             'Python', 'Java', 'JavaScript', 'C++', 'SQL', 'HTML', 'CSS',
             'React', 'Angular', 'Vue', 'Django', 'Flask', 'FastAPI',
-            'Docker', 'Kubernetes', 'AWS', 'Azure', 'Git', 'Linux',
-            'Machine Learning', 'Data Science', 'DevOps', 'CI/CD'
+            'Docker', 'Kubernetes', 'AWS', 'Azure', 'Git', 'Linux'
         ]
         
         found_skills = []
@@ -55,7 +75,8 @@ class ResumeParser:
         return found_skills
     
     @staticmethod
-    def extract_experience(text: str) -> List[Dict[str, str]]:
+    def _extract_experience(text: str) -> list:
+        # Упрощенное извлечение опыта работы
         experience = []
         lines = text.split('\n')
         
@@ -66,14 +87,15 @@ class ResumeParser:
                 # Берем предыдущую строку как должность/компанию
                 if i > 0:
                     experience.append({
-                        'company': lines[i-1].strip(),
+                        'position': lines[i-1].strip(),
                         'period': line.strip()
                     })
         
         return experience
     
     @staticmethod
-    def extract_education(text: str) -> List[Dict[str, str]]:
+    def _extract_education(text: str) -> list:
+        # Упрощенное извлечение образования
         education = []
         lines = text.split('\n')
         
@@ -89,24 +111,3 @@ class ResumeParser:
                     })
         
         return education
-
-@router.post("/upload", response_model=dict)
-async def upload_resume(
-    file: UploadFile = File(...),
-    vacancy_id: int = 1,
-    db: Session = Depends(get_db)
-):
-    # Сохранение файла
-    upload_dir = "uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename)
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
-    
-    # Парсинг резюме
-    text = ""
-    if file.filename.endswith('.pdf'):
-        text = ResumeParser.extract_text_from_pdf(file_path)
-    elif file.filename.endswith('.docx'):
-        text = ResumeParser.extract_text_from_docx(file_path)
