@@ -1,185 +1,176 @@
+# app/services/mock_openai_service.py
 import random
-import re
-from typing import Dict, Any, List
+import time
+from typing import List, Dict, Any, Optional
 
 class MockOpenAIService:
-    def __init__(self):
-        # Инициализация без реального API ключа
-        pass
+    """Mock-сервис для разработки без реального OpenAI API"""
     
-    def generate_interview_question(self, candidate_context, vacancy_requirements, previous_questions=None):
-        """Генерация вопроса для интервью с помощью шаблонов"""
-        # Извлекаем ключевые навыки из требований вакансии
-        skills = self._extract_skills(vacancy_requirements)
-        position = self._extract_position(vacancy_requirements)
-        
-        # Базовые вопросы по категориям
-        question_templates = {
-            "experience": [
-                f"Расскажите о вашем опыте работы с {random.choice(skills) if skills else 'этой технологией'}",
-                "Опишите самый сложный проект, над которым вы работали",
-                "С какими сложностями вы столкнулись в предыдущих проектах?"
+    def __init__(self):
+        self.questions_db = {
+            "Python разработчик": [
+                {
+                    "id": 1,
+                    "question": "Расскажите о вашем опыте работы с Python",
+                    "category": "опыт работы",
+                    "difficulty": "medium",
+                    "skills_tested": ["Python"]
+                },
+                {
+                    "id": 2,
+                    "question": "Какие фреймворки Python вы использовали?",
+                    "category": "технические навыки",
+                    "difficulty": "medium",
+                    "skills_tested": ["Django", "Flask"]
+                },
+                {
+                    "id": 3,
+                    "question": "Опишите ваш опыт работы с базами данных",
+                    "category": "технические навыки",
+                    "difficulty": "medium",
+                    "skills_tested": ["SQL", "PostgreSQL"]
+                }
             ],
-            "technical": [
-                f"Как вы решаете проблемы, связанные с {random.choice(skills) if skills else 'техническими задачами'}?",
-                f"Опишите ваш опыт работы с {random.choice(skills) if skills else 'базами данных'}",
-                "Какие паттерны проектирования вы использовали в своей практике?"
-            ],
-            "soft_skills": [
-                "Как вы работаете в команде?",
-                "Опишите ситуацию, когда вам пришлось разрешить конфликт",
-                "Как вы справляетесь с дедлайнами и давлением?"
-            ],
-            "motivation": [
-                "Почему вы хотите работать в нашей компании?",
-                "Какие ваши карьерные цели на ближайшие 3 года?",
-                "Что вас привлекает в этой позиции?"
+            "Frontend разработчик": [
+                {
+                    "id": 1,
+                    "question": "Расскажите о вашем опыте работы с JavaScript",
+                    "category": "опыт работы",
+                    "difficulty": "medium",
+                    "skills_tested": ["JavaScript"]
+                },
+                {
+                    "id": 2,
+                    "question": "Какие фреймворки frontend вы использовали?",
+                    "category": "технические навыки",
+                    "difficulty": "medium",
+                    "skills_tested": ["React", "Vue"]
+                }
             ]
         }
-        
-        # Выбираем категорию вопроса
-        if not previous_questions:
-            category = "experience"
-        elif len(previous_questions) < 3:
-            category = "technical"
-        elif len(previous_questions) < 5:
-            category = "soft_skills"
-        else:
-            category = "motivation"
-        
-        # Выбираем случайный вопрос из категории
-        question = random.choice(question_templates[category])
-        
-        # Проверяем, что вопрос не повторялся
-        if previous_questions and question in previous_questions:
-            # Если вопрос повторился, берем другой
-            available_questions = [q for q in question_templates[category] if q not in previous_questions]
-            if available_questions:
-                question = random.choice(available_questions)
-            else:
-                # Если все вопросы из категории заданы, переходим к следующей
-                categories = list(question_templates.keys())
-                current_index = categories.index(category)
-                next_category = categories[(current_index + 1) % len(categories)]
-                question = random.choice(question_templates[next_category])
-        
-        return question
     
-    def analyze_answer_quality(self, question, answer, evaluation_criteria):
-        """Анализ качества ответа кандидата на основе ключевых слов и длины"""
-        # Базовая оценка
-        score = 5.0
+    async def generate_interview_questions(
+        self, 
+        position: str, 
+        skills: List[str], 
+        experience_level: str = "middle",
+        previous_questions: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Генерация вопросов (мок)"""
+        # Имитируем задержку сети
+        await asyncio.sleep(0.5)
         
-        # Увеличиваем оценку за длину ответа
-        if len(answer) > 200:
-            score += 1.0
-        elif len(answer) > 100:
-            score += 0.5
+        # Берем вопросы из базы или генерируем стандартные
+        questions = self.questions_db.get(position, [
+            {
+                "id": 1,
+                "question": f"Расскажите о вашем опыте работы с {skills[0] if skills else 'технологиями'}",
+                "category": "опыт работы",
+                "difficulty": "medium",
+                "skills_tested": skills[:1]
+            }
+        ])
         
-        # Увеличиваем оценку за наличие технических терминов
-        tech_terms = ["алгоритм", "база данных", "API", "фреймворк", "библиотека", 
-                     "архитектура", "оптимизация", "тестирование", "развертывание", "безопасность"]
-        for term in tech_terms:
-            if term.lower() in answer.lower():
-                score += 0.3
+        # Исключаем уже заданные вопросы
+        if previous_questions:
+            questions = [q for q in questions if q["question"] not in previous_questions]
         
-        # Увеличиваем оценку за наличие примеров
-        if "например" in answer.lower() or "к примеру" in answer.lower():
-            score += 0.5
-        
-        # Увеличиваем оценку за структурированность ответа
-        if re.search(r'\d+\.', answer):  # Наличие нумерованных списков
-            score += 0.3
-        
-        # Уменьшаем оценку за избегание ответа
-        avoidance_phrases = ["не знаю", "не работал", "не имею опыта", "не могу сказать"]
-        for phrase in avoidance_phrases:
-            if phrase in answer.lower():
-                score -= 1.0
-        
-        # Ограничиваем оценку от 0 до 10
-        return max(0.0, min(10.0, score))
+        return questions[:3]  # Возвращаем до 3 вопросов
     
-    def generate_feedback(self, candidate_name, interview_results, overall_score):
-        """Генерация фидбека для кандидата на основе оценки"""
-        # Определяем уровень кандидата
-        if overall_score >= 8.0:
-            level = "высокий"
-            strengths = ["технические навыки", "опыт работы", "коммуникативные навыки"]
-            improvements = []
-            recommendation = "сильно рекомендуем"
-        elif overall_score >= 6.0:
-            level = "хороший"
-            strengths = ["технические навыки"]
-            improvements = ["некоторые аспекты, требующие развития"]
-            recommendation = "рекомендуем"
-        elif overall_score >= 4.0:
-            level = "средний"
-            strengths = ["мотивация"]
-            improvements = ["технические навыки", "опыт работы"]
-            recommendation = "рассмотрим на следующие этапы"
-        else:
-            level = "низкий"
-            strengths = ["мотивация к обучению"]
-            improvements = ["технические навыки", "опыт работы", "коммуникативные навыки"]
-            recommendation = "не рекомендуем"
+    async def evaluate_answer(
+        self,
+        question: str,
+        answer: str,
+        expected_skills: List[str],
+        question_category: str
+    ) -> Dict[str, Any]:
+        """Оценка ответа (мок)"""
+        # Имитируем задержку сети
+        await asyncio.sleep(1)
         
-        # Генерируем фидбек
-        feedback = f"""
-{candidate_name}, спасибо за уделенное время на прохождение интервью.
-
-Наши эксперты оценили ваши ответы на {overall_score:.1f} баллов из 10, что соответствует {level} уровню.
-
-Сильные стороны:
-"""
+        # Генерируем случайную оценку
+        overall_score = random.uniform(4.0, 9.5)
+        overall_score = round(overall_score, 1)
         
-        # Добавляем сильные стороны
-        for strength in strengths:
-            feedback += f"- Хорошо проявили себя в области {strength}\n"
-        
-        if improvements:
-            feedback += "\nОбласти для улучшения:\n"
-            for improvement in improvements:
-                feedback += f"- Рекомендуем обратить внимание на {improvement}\n"
-        
-        feedback += f"""
-На основании результатов нашего интервью мы {recommendation} вас к следующему этапу отбора.
-
-Желаем успехов в поиске работы!
-        """
-        
-        return feedback.strip()
+        # Генерируем оценки по критериям
+        return {
+            "overall_score": overall_score,
+            "technical_accuracy": random.uniform(3.0, 10.0),
+            "completeness": random.uniform(3.0, 10.0),
+            "clarity": random.uniform(3.0, 10.0),
+            "relevance": random.uniform(3.0, 10.0),
+            "practical_knowledge": random.uniform(3.0, 10.0),
+            "strengths": random.sample([
+                "Хорошо объяснил концепцию",
+                "Привел практический пример",
+                "Показал глубокое понимание темы",
+                "Структурированный ответ",
+                "Отличная коммуникация"
+            ], 2),
+            "improvements": random.sample([
+                "Нужно больше конкретики",
+                "Не хватило технических деталей",
+                "Стоит углубить знания в области",
+                "Рекомендую привести больше примеров"
+            ], 1),
+            "followup_suggestion": random.choice([
+                "Можете привести конкретный пример из вашего опыта?",
+                "Как вы решаете подобные проблемы на практике?",
+                "С какими сложностями вы сталкивались в этой области?"
+            ])
+        }
     
-    def _extract_skills(self, text: str) -> List[str]:
-        """Извлечение навыков из текста"""
-        # Простое извлечение навыков на основе ключевых слов
-        common_skills = [
-            "Python", "JavaScript", "Java", "C++", "React", "Angular", "Vue.js",
-            "Django", "Flask", "Spring", "Node.js", "Express", "PostgreSQL",
-            "MongoDB", "MySQL", "Docker", "Kubernetes", "AWS", "Git", "Linux"
+    async def generate_followup_question(
+        self,
+        original_question: str,
+        candidate_answer: str,
+        evaluation: Dict[str, Any]
+    ) -> str:
+        """Генерация уточняющего вопроса (мок)"""
+        await asyncio.sleep(0.5)
+        
+        followups = [
+            "Можете привести конкретный пример из вашего опыта?",
+            "Как вы решаете подобные проблемы на практике?",
+            "С какими сложностями вы сталкивались в этой области?",
+            "Можете рассказать подробнее о вашем подходе?"
         ]
         
-        found_skills = []
-        text_lower = text.lower()
-        
-        for skill in common_skills:
-            if skill.lower() in text_lower:
-                found_skills.append(skill)
-        
-        return found_skills if found_skills else ["программирование"]
+        return random.choice(followups)
     
-    def _extract_position(self, text: str) -> str:
-        """Извлечение должности из текста"""
-        # Простое извлечение должности
-        positions = [
-            "разработчик", "программист", "инженер", "архитектор", "аналитик",
-            "менеджер", "дизайнер", "тестировщик", "devops", "data scientist"
-        ]
+    async def generate_interview_summary(
+        self,
+        candidate_name: str,
+        position: str,
+        interview_results: List[Dict[str, Any]],
+        overall_score: float
+    ) -> str:
+        """Генерация итогового резюме (мок)"""
+        await asyncio.sleep(1)
         
-        text_lower = text.lower()
+        if overall_score >= 8:
+            recommendation = "сильно рекомендуется к найму"
+        elif overall_score >= 6:
+            recommendation = "рекомендуется к дальнейшему рассмотрению"
+        else:
+            recommendation = "не рекомендуется"
         
-        for position in positions:
-            if position in text_lower:
-                return position
+        return f"""
+Кандидат {candidate_name} прошел техническое собеседование на позицию {position}.
         
-        return "специалист"
+Общая оценка: {overall_score}/10
+Рекомендация: {recommendation}
+
+Ключевые сильные стороны:
+- Демонстрирует хорошие технические знания
+- Показывает умение решать сложные задачи
+- Хорошо коммуницирует технические концепции
+
+Области для развития:
+- Углубить знания в специфических технологиях
+- Больше практического опыта в реальных проектах
+
+Следующие шаги:
+- Рекомендуется техническое собеседование с командой
+- Тестовое задание для проверки практических навыков
+        """.strip()
