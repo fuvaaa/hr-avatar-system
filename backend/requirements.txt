@@ -10,11 +10,8 @@ python-dotenv==1.0.0
 psycopg2-binary==2.9.9
 alembic==1.13.1
 
-# Замените проблемные пакеты на альтернативы
-# Вместо spacy (который тянет blis) используем более легкие альтернативы
-# Если вам нужна обработка текста, используйте:
-# nltk==3.8.1
-# textblob==0.17.1
+# OpenAI
+openai==1.3.0
 
-# Если вам нужны эмбеддинги, используйте:
-# sentence-transformers==2.2.2
+# Pydantic settings
+pydantic-settings==2.1.0
