@@ -41,10 +41,12 @@ def generate_hr_response(candidate_message: str, conversation_history: List[Dict
     else:
         return generate_fallback_response(candidate_message)
 
+# app/services/hr_avatar.py
 def generate_huggingface_response(candidate_message: str, conversation_history: List[Dict] = None) -> Dict[str, str]:
     """
     Генерирует ответ с использованием Hugging Face Inference API
     """
+    # Используем более подходящую модель для диалога
     API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
     headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
     
@@ -77,6 +79,10 @@ def generate_huggingface_response(candidate_message: str, conversation_history: 
         
         # Убираем возможные артефакты
         hr_response = hr_response.split("Пользователь:")[0].strip()
+        
+        # Если ответ слишком короткий или не релевантный, используем заглушку
+        if len(hr_response) < 10 or "Извините" in hr_response:
+            return generate_fallback_response(candidate_message)
         
         suggestions = generate_suggestions(candidate_message, hr_response)
         
