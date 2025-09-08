@@ -43,57 +43,46 @@ def generate_hr_response(candidate_message: str, conversation_history: List[Dict
 
 # app/services/hr_avatar.py
 def generate_huggingface_response(candidate_message: str, conversation_history: List[Dict] = None) -> Dict[str, str]:
-    """
-    Генерирует ответ с использованием Hugging Face Inference API
-    """
-    # Используем более подходящую модель для диалога
-    API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
-    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+    # Используем более продвинутую модель
+    API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill"
     
-    # Формируем промпт с историей диалога
-    prompt = HR_SYSTEM_PROMPT + "\n\n"
+    # Формируем промпт с учетом истории
+    context = ""
     if conversation_history:
-        for msg in conversation_history:
-            role = "Пользователь" if msg["role"] == "user" else "HR"
-            prompt += f"{role}: {msg['content']}\n"
-    prompt += f"Пользователь: {candidate_message}\nHR:"
+        for msg in conversation_history[-3:]:  # Берем только последние 3 сообщения
+            role = "Пользователь" if msg["role"] == "user" else "Ассистент"
+            context += f"{role}: {msg['content']}\n"
+    
+    prompt = f"{context}Пользователь: {candidate_message}\nАссистент:"
     
     payload = {"inputs": prompt}
     
     try:
         response = requests.post(API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        
         result = response.json()
         
-        # Обрабатываем ответ
         if isinstance(result, list) and len(result) > 0:
             generated_text = result[0].get("generated_text", "")
-            # Извлекаем только ответ HR
-            if "HR:" in generated_text:
-                hr_response = generated_text.split("HR:")[-1].strip()
+            # Извлекаем только последний ответ ассистента
+            if "Ассистент:" in generated_text:
+                hr_response = generated_text.split("Ассистент:")[-1].strip()
             else:
                 hr_response = generated_text.replace(prompt, "").strip()
-        else:
-            hr_response = "Извините, я не смог сгенерировать ответ."
+            
+            # Фильтруем нежелательные ответы
+            if len(hr_response) > 10 and "расскажите" not in hr_response.lower():
+                return {
+                    "response": hr_response,
+                    "suggestions": generate_suggestions(candidate_message, hr_response)
+                }
         
-        # Убираем возможные артефакты
-        hr_response = hr_response.split("Пользователь:")[0].strip()
+        # Если ответ не подошел, используем умную заглушку
+        return generate_smart_fallback(candidate_message, conversation_history)
         
-        # Если ответ слишком короткий или не релевантный, используем заглушку
-        if len(hr_response) < 10 or "Извините" in hr_response:
-            return generate_fallback_response(candidate_message)
-        
-        suggestions = generate_suggestions(candidate_message, hr_response)
-        
-        return {
-            "response": hr_response,
-            "suggestions": suggestions
-        }
     except Exception as e:
         print(f"Error generating Hugging Face response: {e}")
         return generate_fallback_response(candidate_message)
-
+    
 def generate_openai_response(candidate_message: str, conversation_history: List[Dict] = None) -> Dict[str, str]:
     """
     Генерирует ответ с использованием OpenAI API
