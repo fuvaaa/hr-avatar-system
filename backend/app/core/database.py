@@ -1,16 +1,12 @@
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, Text, DateTime, ForeignKey, JSON, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import os
+from app.models import Base  # Импортируем Base из моделей
+from app.core.config import settings
 
-# Используем переменную окружения для подключения к базе данных
-DATABASE_URL = os.getenv("DATABASE_URL")
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
-# Создаем движок SQLAlchemy
-engine = create_engine(DATABASE_URL)
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
@@ -20,5 +16,4 @@ def get_db():
         db.close()
 
 def create_tables():
-    """Создание таблиц если они не существуют"""
-    Base.metadata.create_all(bind=engine, checkfirst=True)
+    Base.metadata.create_all(bind=engine)

@@ -1,112 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.models.candidate import Candidate
-from typing import List, Dict, Any
-import os
-import json
-import PyPDF2
-import docx
-import re
+from typing import List
+from app.core.database import get_db  # Исправленный путь
+from app.models import Candidate  # Импортируем модель
+from app.schemas import CandidateCreate, CandidateResponse
 
 router = APIRouter()
 
-class ResumeParser:
-    """Упрощенный парсер резюме для извлечения ключевых данных"""
+@router.post("/", response_model=CandidateResponse)
+def create_candidate(candidate: CandidateCreate, db: Session = Depends(get_db)):
+    # Проверяем, существует ли кандидат с таким email
+    db_candidate = db.query(Candidate).filter(Candidate.email == candidate.email).first()
+    if db_candidate:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    @staticmethod
-    def extract_text_from_pdf(file_path: str) -> str:
-        with open(file_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
-            return " ".join([page.extract_text() for page in reader.pages])
-    
-    @staticmethod
-    def extract_text_from_docx(file_path: str) -> str:
-        doc = docx.Document(file_path)
-        return " ".join([paragraph.text for paragraph in doc.paragraphs])
-    
-    @staticmethod
-    def extract_contact_info(text: str) -> Dict[str, str]:
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        phone_pattern = r'(\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4,6})'
-        
-        email = re.search(email_pattern, text)
-        phone = re.search(phone_pattern, text)
-        
-        return {
-            'email': email.group() if email else '',
-            'phone': phone.group() if phone else ''
-        }
-    
-    @staticmethod
-    def extract_skills(text: str) -> List[str]:
-        common_skills = [
-            'Python', 'Java', 'JavaScript', 'C++', 'SQL', 'HTML', 'CSS',
-            'React', 'Angular', 'Vue', 'Django', 'Flask', 'FastAPI',
-            'Docker', 'Kubernetes', 'AWS', 'Azure', 'Git', 'Linux',
-            'Machine Learning', 'Data Science', 'DevOps', 'CI/CD'
-        ]
-        
-        found_skills = []
-        for skill in common_skills:
-            if skill.lower() in text.lower():
-                found_skills.append(skill)
-        
-        return found_skills
-    
-    @staticmethod
-    def extract_experience(text: str) -> List[Dict[str, str]]:
-        experience = []
-        lines = text.split('\n')
-        
-        for i, line in enumerate(lines):
-            # Поиск строк с годами (2018-2020, 2019 - настоящее время)
-            year_pattern = r'(19|20)\d{2}[\s-–—]*(19|20)\d{2}|настоящее время'
-            if re.search(year_pattern, line):
-                # Берем предыдущую строку как должность/компанию
-                if i > 0:
-                    experience.append({
-                        'company': lines[i-1].strip(),
-                        'period': line.strip()
-                    })
-        
-        return experience
-    
-    @staticmethod
-    def extract_education(text: str) -> List[Dict[str, str]]:
-        education = []
-        lines = text.split('\n')
-        
-        education_keywords = ['университет', 'институт', 'академия', 'образование']
-        
-        for i, line in enumerate(lines):
-            if any(keyword in line.lower() for keyword in education_keywords):
-                # Берем следующую строку как специальность
-                if i+1 < len(lines):
-                    education.append({
-                        'institution': line.strip(),
-                        'degree': lines[i+1].strip()
-                    })
-        
-        return education
+    # Создаем нового кандидата
+    new_candidate = Candidate(**candidate.dict())
+    db.add(new_candidate)
+    db.commit()
+    db.refresh(new_candidate)
+    return new_candidate
 
-@router.post("/upload", response_model=dict)
-async def upload_resume(
-    file: UploadFile = File(...),
-    vacancy_id: int = 1,
-    db: Session = Depends(get_db)
-):
-    # Сохранение файла
-    upload_dir = "uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename)
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
-    
-    # Парсинг резюме
-    text = ""
-    if file.filename.endswith('.pdf'):
-        text = ResumeParser.extract_text_from_pdf(file_path)
-    elif file.filename.endswith('.docx'):
-        text = ResumeParser.extract_text_from_docx(file_path)
+@router.get("/", response_model=List[CandidateResponse])
+def get_candidates(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    candidates = db.query(Candidate).offset(skip).limit(limit).all()
+    return candidates
+
+@router.get("/{candidate_id}", response_model=CandidateResponse)
+def get_candidate(candidate_id: int, db: Session = Depends(get_db)):
+    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return candidate

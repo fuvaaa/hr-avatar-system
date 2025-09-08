@@ -1,5 +1,6 @@
+from .base import Base
 from .candidate import Candidate
 from .interview import Interview
-from .vacancy import Vacancy
+from .message import Message
 
-__all__ = ['Candidate', 'Interview', 'Vacancy']
+__all__ = ['Base', 'Candidate', 'Interview', 'Message']

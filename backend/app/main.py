@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.declarative import declarative_base
 from app.api import candidates, interviews, reports
-from app.core.database import engine, Base, create_tables
+from app.core.database import engine, create_tables
 from app.models import *  # Важно импортировать все модели
+from app.core.config import settings
 
 app = FastAPI(title="HR Avatar System API")
 
